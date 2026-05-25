@@ -1,0 +1,88 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/blues-core",
+    "crates/blues-protocol",
+    "crates/blues-config",
+    "crates/blues-memory",
+    "crates/blues-model",
+    "crates/blues-agent",
+    "crates/blues-plan",
+    "crates/blues-sandbox",
+    "crates/blues-skill",
+    "crates/blues-daemon",
+    "crates/blues-cli",
+    "crates/blues-mcp",
+]
+
+[workspace.package]
+version      = "0.1.0-dev"
+edition      = "2021"
+rust-version = "1.90"
+license      = "Apache-2.0"
+authors      = ["Blues Contributors"]
+repository   = "https://github.com/blues-tools/blues"
+homepage     = "https://blues.dev"
+readme       = "README.md"
+
+# ── 共享依赖菜单 ──────────────────────────────────────────────────────────
+# 所有 crate 必须从此处引用，禁止 crate 内单独声明版本号。
+# 加新依赖前先评估是否真的需要——v0.1 死磕五件套，杂质最少。
+[workspace.dependencies]
+# core
+thiserror      = "1.0"
+anyhow         = "1.0"
+serde          = { version = "1.0", features = ["derive"] }
+serde_json     = "1.0"
+toml           = "0.8"
+ulid           = { version = "1.1", features = ["serde"] }
+time           = { version = "0.3", features = ["serde", "formatting", "parsing"] }
+async-trait    = "0.1"
+
+# concurrency / runtime
+tokio          = { version = "1.38", features = ["full"] }
+futures        = "0.3"
+parking_lot    = "0.12"
+
+# tracing / observability
+tracing            = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# protocol layer (filled out in task #7)
+tonic       = "0.12"
+prost       = "0.13"
+tonic-build = "0.12"
+protoc-bin-vendored = "3.0"
+
+# memory layer (filled out in task #8)
+rusqlite   = { version = "0.31", features = ["bundled"] }
+
+# CLI
+clap            = { version = "4.5", features = ["derive", "env"] }
+clap_complete   = "4.5"
+ratatui         = "0.27"
+crossterm       = "0.27"
+indicatif       = "0.17"
+owo-colors      = "4.0"
+
+# internal
+blues-core     = { path = "crates/blues-core",     version = "0.1.0-dev" }
+blues-protocol = { path = "crates/blues-protocol", version = "0.1.0-dev" }
+blues-config   = { path = "crates/blues-config",   version = "0.1.0-dev" }
+blues-memory   = { path = "crates/blues-memory",   version = "0.1.0-dev" }
+blues-model    = { path = "crates/blues-model",    version = "0.1.0-dev" }
+blues-agent    = { path = "crates/blues-agent",    version = "0.1.0-dev" }
+blues-plan     = { path = "crates/blues-plan",     version = "0.1.0-dev" }
+blues-sandbox  = { path = "crates/blues-sandbox",  version = "0.1.0-dev" }
+blues-skill    = { path = "crates/blues-skill",    version = "0.1.0-dev" }
+blues-daemon   = { path = "crates/blues-daemon",   version = "0.1.0-dev" }
+blues-mcp      = { path = "crates/blues-mcp",      version = "0.1.0-dev" }
+
+[profile.release]
+lto           = "thin"
+codegen-units = 1
+strip         = "symbols"
+panic         = "abort"
+
+[profile.dev]
+debug = 1

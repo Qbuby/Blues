@@ -1,0 +1,18 @@
+[package]
+name        = "blues-skill"
+version     = { workspace = true }
+edition     = { workspace = true }
+rust-version= { workspace = true }
+license     = { workspace = true }
+authors     = { workspace = true }
+description = "Skill loader + scheduler. Compatible with Claude Code skill format."
+
+[dependencies]
+blues-core  = { workspace = true }
+serde       = { workspace = true }
+serde_json  = { workspace = true }
+async-trait = { workspace = true }
+thiserror   = { workspace = true }
+tracing     = { workspace = true }
+toml        = { workspace = true }
+tokio       = { workspace = true }

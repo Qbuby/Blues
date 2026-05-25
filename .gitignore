@@ -1,0 +1,18 @@
+target/
+**/*.rs.bk
+*.pdb
+
+# build / debug
+debug/
+release/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# blues runtime
+~/.blues/

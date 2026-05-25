@@ -1,0 +1,34 @@
+[package]
+name        = "blues-daemon"
+version     = { workspace = true }
+edition     = { workspace = true }
+rust-version= { workspace = true }
+license     = { workspace = true }
+authors     = { workspace = true }
+description = "Blues daemon: gRPC server + orchestrator + event bus + state persistence."
+
+[[bin]]
+name = "blues-daemon"
+path = "src/main.rs"
+
+[dependencies]
+blues-core     = { workspace = true }
+blues-protocol = { workspace = true }
+blues-config   = { workspace = true }
+blues-memory   = { workspace = true }
+blues-model    = { workspace = true }
+blues-agent    = { workspace = true }
+blues-plan     = { workspace = true }
+blues-sandbox  = { workspace = true }
+blues-skill    = { workspace = true }
+
+serde              = { workspace = true }
+serde_json         = { workspace = true }
+async-trait        = { workspace = true }
+thiserror          = { workspace = true }
+anyhow             = { workspace = true }
+tracing            = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio              = { workspace = true }
+parking_lot        = { workspace = true }
+time               = { workspace = true }

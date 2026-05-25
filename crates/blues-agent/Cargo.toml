@@ -1,0 +1,18 @@
+[package]
+name        = "blues-agent"
+version     = { workspace = true }
+edition     = { workspace = true }
+rust-version= { workspace = true }
+license     = { workspace = true }
+authors     = { workspace = true }
+description = "Single-agent ReAct executor used by Blues plan nodes."
+
+[dependencies]
+blues-core   = { workspace = true }
+blues-model  = { workspace = true }
+blues-memory = { workspace = true }
+serde        = { workspace = true }
+async-trait  = { workspace = true }
+thiserror    = { workspace = true }
+tracing      = { workspace = true }
+tokio        = { workspace = true }

@@ -1,0 +1,19 @@
+[package]
+name        = "blues-plan"
+version     = { workspace = true }
+edition     = { workspace = true }
+rust-version= { workspace = true }
+license     = { workspace = true }
+authors     = { workspace = true }
+description = "Plan Graph DAG engine: state machine, scheduler, fork/replay (v0.2)."
+
+[dependencies]
+blues-core  = { workspace = true }
+serde       = { workspace = true }
+serde_json  = { workspace = true }
+async-trait = { workspace = true }
+thiserror   = { workspace = true }
+tracing     = { workspace = true }
+tokio       = { workspace = true }
+parking_lot = { workspace = true }
+time        = { workspace = true }

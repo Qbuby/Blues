@@ -1,0 +1,473 @@
+// Blues v0.1 wire protocol.
+// See docs/architecture/protocol-and-project.md §3 + ARCHITECTURE.md §7.
+//
+// Stable for v0.1. Bumps to PROTOCOL_VERSION (blues-protocol::PROTOCOL_VERSION)
+// only on breaking changes; pure additions stay at v1.
+
+syntax = "proto3";
+
+package blues.v1;
+
+// ─── Common ──────────────────────────────────────────────────────────────
+
+message Empty {}
+
+// ULID strings everywhere (`blues_core::ids::*`).
+message ProjectRef {
+  // Either a ULID or a slug; daemon resolves.
+  string id_or_slug = 1;
+}
+
+message PlanRef  { string plan_id = 1; }
+message NodeRef  { string plan_id = 1; string node_id = 2; }
+
+enum PlanStatus {
+  PLAN_STATUS_UNSPECIFIED = 0;
+  PLAN_STATUS_PENDING     = 1;
+  PLAN_STATUS_RUNNING     = 2;
+  PLAN_STATUS_PAUSED      = 3;
+  PLAN_STATUS_DONE        = 4;
+  PLAN_STATUS_ERROR       = 5;
+  PLAN_STATUS_CANCELLED   = 6;
+}
+
+enum NodeStatus {
+  NODE_STATUS_UNSPECIFIED = 0;
+  NODE_STATUS_PENDING     = 1;
+  NODE_STATUS_RUNNING     = 2;
+  NODE_STATUS_PAUSED      = 3;
+  NODE_STATUS_DONE        = 4;
+  NODE_STATUS_ERROR       = 5;
+  NODE_STATUS_FORKED      = 6;
+}
+
+enum MemoryType {
+  MEMORY_TYPE_UNSPECIFIED = 0;
+  MEMORY_TYPE_EPISODIC    = 1;
+  MEMORY_TYPE_SEMANTIC    = 2;
+  MEMORY_TYPE_PROCEDURAL  = 3;
+}
+
+enum MemoryScope {
+  MEMORY_SCOPE_UNSPECIFIED = 0;
+  MEMORY_SCOPE_PROJECT     = 1;
+  MEMORY_SCOPE_LINKED      = 2;
+  MEMORY_SCOPE_GLOBAL      = 3;
+}
+
+enum ClientKind {
+  CLIENT_KIND_UNSPECIFIED = 0;
+  CLIENT_KIND_DESKTOP     = 1;
+  CLIENT_KIND_CLI         = 2;
+  CLIENT_KIND_VSCODE      = 3;
+  CLIENT_KIND_MCP         = 4;
+}
+
+// ─── Daemon meta ─────────────────────────────────────────────────────────
+
+message HelloRequest {
+  ClientKind client_kind     = 1;
+  string     client_version  = 2;
+  // Wire protocol version the client speaks (`PROTOCOL_VERSION`).
+  uint32     protocol_version = 3;
+}
+
+message HelloResponse {
+  string                server_version    = 1;
+  uint32                protocol_version  = 2;
+  repeated string       supported_features = 3;
+  repeated ProjectBrief active_projects   = 4;
+  // Opaque token for re-subscribe / event replay.
+  string                session_token     = 5;
+}
+
+message HealthStatus {
+  string pid               = 1;
+  uint64 uptime_ms         = 2;
+  uint32 active_plan_count = 3;
+  uint32 connected_clients = 4;
+}
+
+message ShutdownRequest {
+  uint64 grace_ms = 1;
+}
+
+// ─── Project ─────────────────────────────────────────────────────────────
+
+message ProjectBrief {
+  string project_id = 1;
+  string slug       = 2;
+  string name       = 3;
+}
+
+message Project {
+  string                 project_id  = 1;
+  string                 slug        = 2;
+  string                 name        = 3;
+  string                 created_at  = 4;  // RFC3339
+  uint32                 schema      = 5;
+  repeated ProjectRoot   roots       = 6;
+  repeated LinkedProject linked      = 7;
+  string                 memory_storage = 8;  // "global" | "inproject"
+  string                 policy_inherit = 9;
+}
+
+message ProjectRoot {
+  string path = 1;
+  string role = 2;  // primary | mirror | worktree | detached
+}
+
+message LinkedProject {
+  string          project = 1;  // slug or id
+  repeated string scope   = 2;
+}
+
+message ProjectList {
+  repeated Project projects = 1;
+}
+
+message CreateProjectReq {
+  string path = 1;
+  string name = 2;
+  string slug = 3;
+}
+
+message UpdateProjectReq {
+  ProjectRef                project = 1;
+  optional string           name    = 2;
+  repeated LinkedProject    linked  = 3;
+  optional string           memory_storage = 4;
+}
+
+message ImportProjectReq {
+  string path = 1;
+}
+
+// SetActiveContext (ARCHITECTURE.md §7 patch #1).
+// Tells daemon which project / plan the calling client is "focused" on,
+// so daemon can broadcast ActiveContextChanged to siblings.
+message SetActiveContextReq {
+  optional string project_id = 1;
+  optional string plan_id    = 2;
+  ClientKind      client_kind = 3;
+}
+
+// ─── Memory ──────────────────────────────────────────────────────────────
+
+message MemoryQuery {
+  ProjectRef  project = 1;
+  string      query   = 2;
+  uint32      top_k   = 3;  // default 8
+  MemoryScope scope   = 4;  // default PROJECT
+}
+
+message MemoryResult {
+  string     memory_id  = 1;
+  MemoryType type       = 2;
+  string     content    = 3;
+  float      score      = 4;
+  // Provenance JSON (blues_core::provenance::Provenance).
+  string     provenance_json = 5;
+}
+
+message MemoryResults {
+  repeated MemoryResult items = 1;
+}
+
+message MemoryWrite {
+  ProjectRef       project    = 1;
+  MemoryType       type       = 2;
+  string           content    = 3;
+  optional string  source     = 4;
+  optional float   confidence = 5;
+  // Optional plan/node attribution (patch #5 expands InboxAdded the same way).
+  optional string  plan_id    = 6;
+  optional string  node_id    = 7;
+}
+
+message MemoryRef {
+  string memory_id = 1;
+  // Whether write went straight to store or sat in inbox awaiting approval.
+  bool   in_inbox  = 2;
+}
+
+message InboxFilter {
+  ProjectRef     project = 1;
+  uint32         limit   = 2;  // default 20
+  optional string after_id = 3;  // pagination cursor
+}
+
+message InboxItem {
+  string          item_id    = 1;
+  MemoryType      type       = 2;
+  string          summary    = 3;
+  string          content    = 4;
+  float           confidence = 5;
+  string          provenance_json = 6;
+  optional string plan_id    = 7;
+  optional string node_id    = 8;
+}
+
+message InboxItems {
+  repeated InboxItem items = 1;
+}
+
+enum InboxDecision {
+  INBOX_DECISION_UNSPECIFIED = 0;
+  INBOX_DECISION_APPROVE     = 1;
+  INBOX_DECISION_REJECT      = 2;
+  INBOX_DECISION_EDIT        = 3;
+}
+
+message InboxAction {
+  string         item_id  = 1;
+  InboxDecision  decision = 2;
+  // For EDIT: edited content overrides the candidate.
+  optional string edited_content = 3;
+}
+
+message ContextRequest {
+  ProjectRef      project          = 1;
+  string          task_description = 2;
+  uint32          token_budget     = 3;
+  optional string model_id         = 4;
+}
+
+message CompiledContext {
+  string text                 = 1;
+  uint32 estimated_tokens     = 2;
+  // Provenance map: memory_id -> Provenance JSON.
+  map<string, string> provenance = 3;
+}
+
+// ─── Plan / Agent ────────────────────────────────────────────────────────
+
+message Plan {
+  string     plan_id    = 1;
+  string     project_id = 2;
+  string     intent     = 3;
+  PlanStatus status     = 4;
+  string     created_at = 5;  // RFC3339
+}
+
+message Node {
+  string     node_id  = 1;
+  string     plan_id  = 2;
+  string     kind     = 3;  // llm_task | tool | subgraph
+  NodeStatus status   = 4;
+  string     summary  = 5;
+  optional string error = 6;
+}
+
+message PlanState {
+  Plan          plan  = 1;
+  repeated Node nodes = 2;
+}
+
+message PlanHandle {
+  string plan_id = 1;
+}
+
+message CreatePlanReq {
+  ProjectRef project = 1;
+  string     intent  = 2;
+}
+
+message EditNodeReq {
+  NodeRef         node            = 1;
+  optional string new_prompt      = 2;
+  optional string new_kind        = 3;
+}
+
+message InjectReq {
+  NodeRef node    = 1;
+  string  message = 2;
+}
+
+// ─── Model ───────────────────────────────────────────────────────────────
+
+message ModelInfo {
+  string provider = 1;
+  string model_id = 2;
+  uint32 context_window = 3;
+  bool   available      = 4;
+}
+
+message ModelList {
+  repeated ModelInfo models = 1;
+}
+
+message UsageQuery {
+  optional string since = 1;  // RFC3339
+  optional string until = 2;
+}
+
+message UsageReport {
+  uint64 in_tokens  = 1;
+  uint64 out_tokens = 2;
+  double cost_usd   = 3;
+  // Per-provider breakdown.
+  map<string, ProviderUsage> by_provider = 4;
+}
+
+message ProviderUsage {
+  uint64 in_tokens  = 1;
+  uint64 out_tokens = 2;
+  double cost_usd   = 3;
+}
+
+// ─── Streams ─────────────────────────────────────────────────────────────
+
+message EventFilter {
+  // Subset of EventKind names (snake_case). Empty == all.
+  repeated string kinds = 1;
+  // Optional project / plan scoping.
+  optional string project_id = 2;
+  optional string plan_id    = 3;
+}
+
+// One Event payload, oneof keeps wire compact and matches the rust enum.
+message Event {
+  oneof payload {
+    PlanStateChangedEvent    plan_state_changed     = 1;
+    NodeStateChangedEvent    node_state_changed     = 2;
+    NodeOutputDeltaEvent     node_output_delta      = 3;
+    MemoryInboxAddedEvent    memory_inbox_added     = 4;
+    PermissionAskEvent       permission_ask         = 5;
+    PermissionResolvedEvent  permission_resolved    = 6;  // patch #6
+    TokenUsageEvent          token_usage            = 7;
+    ProjectActivatedEvent    project_activated      = 8;
+    ProjectArchivedEvent     project_archived       = 9;
+    ActiveContextChangedEvent active_context_changed = 10; // patch #2
+    PlanForkedEvent          plan_forked            = 11; // patch #3 (v0.2 behavior)
+    PlanReplayedEvent        plan_replayed          = 12; // patch #4 (v0.2 behavior)
+    DaemonShuttingDownEvent  daemon_shutting_down   = 13;
+  }
+}
+
+message PlanStateChangedEvent {
+  string     plan_id = 1;
+  PlanStatus old     = 2;
+  PlanStatus new     = 3;
+}
+
+message NodeStateChangedEvent {
+  string          plan_id = 1;
+  string          node_id = 2;
+  NodeStatus      status  = 3;
+  optional string error   = 4;
+}
+
+message NodeOutputDeltaEvent {
+  string plan_id = 1;
+  string node_id = 2;
+  // UTF-8 chunk of model output.
+  string delta   = 3;
+}
+
+message MemoryInboxAddedEvent {
+  string          project_id = 1;
+  string          item_id    = 2;
+  string          summary    = 3;
+  float           confidence = 4;
+  optional string plan_id    = 5;  // patch #5
+  optional string node_id    = 6;  // patch #5
+}
+
+message PermissionAskEvent {
+  string plan_id    = 1;
+  string node_id    = 2;
+  string capability = 3;
+  string args_json  = 4;
+  string request_id = 5;
+}
+
+message PermissionResolvedEvent {
+  string     plan_id        = 1;
+  string     node_id        = 2;
+  string     request_id     = 3;
+  string     decision       = 4;  // allow_once | allow_session | deny
+  ClientKind by_client_kind = 5;
+}
+
+message TokenUsageEvent {
+  string plan_id    = 1;
+  string node_id    = 2;
+  string provider   = 3;
+  uint64 in_tokens  = 4;
+  uint64 out_tokens = 5;
+  double cost_usd   = 6;
+}
+
+message ProjectActivatedEvent { string project_id = 1; }
+message ProjectArchivedEvent  { string project_id = 1; }
+
+message ActiveContextChangedEvent {
+  optional string project_id     = 1;
+  optional string plan_id        = 2;
+  ClientKind      by_client_kind = 3;
+}
+
+message PlanForkedEvent {
+  string plan_id        = 1;
+  string parent_node_id = 2;
+  string new_plan_id    = 3;
+}
+
+message PlanReplayedEvent {
+  string plan_id      = 1;
+  string from_node_id = 2;
+}
+
+message DaemonShuttingDownEvent {
+  uint64 eta_ms = 1;
+}
+
+// Streaming agent output (per-step ReAct events).
+message ChatEvent {
+  string kind = 1;  // text | tool_call | tool_result | end
+  string body = 2;  // payload (UTF-8 / JSON for tool_call)
+}
+
+// ─── Service ─────────────────────────────────────────────────────────────
+
+service BluesService {
+  // Daemon meta
+  rpc Hello       (HelloRequest)    returns (HelloResponse);
+  rpc Health      (Empty)           returns (HealthStatus);
+  rpc Shutdown    (ShutdownRequest) returns (Empty);
+
+  // Project
+  rpc ListProjects        (Empty)               returns (ProjectList);
+  rpc GetProject          (ProjectRef)          returns (Project);
+  rpc CreateProject       (CreateProjectReq)    returns (Project);
+  rpc UpdateProjectConfig (UpdateProjectReq)    returns (Project);
+  rpc ImportProject       (ImportProjectReq)    returns (Project);
+  rpc ArchiveProject      (ProjectRef)          returns (Empty);
+  rpc SetActiveContext    (SetActiveContextReq) returns (Empty);  // patch #1
+
+  // Memory
+  rpc QueryMemory      (MemoryQuery)    returns (MemoryResults);
+  rpc SaveMemory       (MemoryWrite)    returns (MemoryRef);
+  rpc ListInbox        (InboxFilter)    returns (InboxItems);
+  rpc ApproveInboxItem (InboxAction)    returns (Empty);
+  rpc CompileContext   (ContextRequest) returns (CompiledContext);
+
+  // Plan / Agent
+  rpc CreatePlan    (CreatePlanReq) returns (Plan);
+  rpc StartPlan     (PlanRef)       returns (PlanHandle);
+  rpc PausePlan     (PlanRef)       returns (Empty);
+  rpc ResumePlan    (PlanRef)       returns (Empty);
+  rpc CancelPlan    (PlanRef)       returns (Empty);
+  rpc EditNode      (EditNodeReq)   returns (Node);
+  rpc InjectMessage (InjectReq)     returns (Empty);
+  rpc GetPlanState  (PlanRef)       returns (PlanState);
+
+  // Model
+  rpc ListModels (Empty)      returns (ModelList);
+  rpc GetUsage   (UsageQuery) returns (UsageReport);
+
+  // Streams
+  rpc SubscribeEvents   (EventFilter) returns (stream Event);
+  rpc StreamAgentOutput (NodeRef)     returns (stream ChatEvent);
+}

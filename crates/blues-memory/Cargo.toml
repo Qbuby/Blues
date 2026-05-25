@@ -1,0 +1,23 @@
+[package]
+name        = "blues-memory"
+version     = { workspace = true }
+edition     = { workspace = true }
+rust-version= { workspace = true }
+license     = { workspace = true }
+authors     = { workspace = true }
+description = "Blues memory engine: episodic + semantic + procedural with inbox funnel."
+
+[dependencies]
+blues-core  = { workspace = true }
+serde       = { workspace = true }
+serde_json  = { workspace = true }
+async-trait = { workspace = true }
+thiserror   = { workspace = true }
+tracing     = { workspace = true }
+rusqlite    = { workspace = true }
+time        = { workspace = true }
+tokio       = { workspace = true }
+parking_lot = { workspace = true }
+
+[dev-dependencies]
+anyhow      = { workspace = true }

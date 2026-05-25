@@ -1,0 +1,24 @@
+[package]
+name        = "blues-mcp"
+version     = { workspace = true }
+edition     = { workspace = true }
+rust-version= { workspace = true }
+license     = { workspace = true }
+authors     = { workspace = true }
+description = "Blues MCP server. Exposes memory tools to MCP hosts (Claude Code / Cursor / ...)."
+
+[[bin]]
+name = "blues-mcp"
+path = "src/main.rs"
+
+[dependencies]
+blues-core     = { workspace = true }
+blues-protocol = { workspace = true }
+
+serde              = { workspace = true }
+serde_json         = { workspace = true }
+anyhow             = { workspace = true }
+thiserror          = { workspace = true }
+tracing            = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio              = { workspace = true }
